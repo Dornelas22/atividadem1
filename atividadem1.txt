@@ -1,0 +1,97 @@
+######################
+# 1. Script SQL (Flyway)
+######################
+ALTER TABLE product ADD COLUMN distribution_center VARCHAR(100);
+
+-- Atualizar valores manualmente
+UPDATE product SET distribution_center = 'Mogi das Cruzes' WHERE id IN ('p1', 'p2', 'p3');
+UPDATE product SET distribution_center = 'Recife' WHERE id IN ('p4', 'p5', 'p6');
+UPDATE product SET distribution_center = 'Porto Alegre' WHERE id IN ('p7', 'p8', 'p9');
+
+######################
+# 2. Entidade Product.java
+######################
+public class Product {
+    private String id;
+    private String name;
+    private String distributionCenter;
+
+    // Getters e Setters
+    public String getDistributionCenter() {
+        return distributionCenter;
+    }
+
+    public void setDistributionCenter(String distributionCenter) {
+        this.distributionCenter = distributionCenter;
+    }
+}
+
+######################
+# 3. Classe de Serviço - ViaCepService.java
+######################
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+@Service
+public class ViaCepService {
+    public String buscarCidadePorCep(String cep) {
+        String url = "https://viacep.com.br/ws/" + cep + "/json/";
+        RestTemplate restTemplate = new RestTemplate();
+        ViaCepResponse response = restTemplate.getForObject(url, ViaCepResponse.class);
+        return response.getLocalidade(); // cidade
+    }
+
+    public boolean verificarDistribuicao(String cep, Product produto) {
+        String cidadeCep = buscarCidadePorCep(cep);
+        return cidadeCep.equalsIgnoreCase(produto.getDistributionCenter());
+    }
+}
+
+######################
+# 4. Classe ViaCepResponse.java
+######################
+public class ViaCepResponse {
+    private String localidade;
+
+    public String getLocalidade() {
+        return localidade;
+    }
+
+    public void setLocalidade(String localidade) {
+        this.localidade = localidade;
+    }
+}
+
+######################
+# 5. Controller - ProductController.java
+######################
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/produtos")
+public class ProductController {
+
+    private final ViaCepService viaCepService;
+
+    public ProductController(ViaCepService viaCepService) {
+        this.viaCepService = viaCepService;
+    }
+
+    @GetMapping("/verificar")
+    public boolean verificarDistribuicao(@RequestParam String cep, @RequestParam String id) {
+        // Simulação de busca do produto
+        Product produto = new Product();
+        produto.setId(id);
+        produto.setDistributionCenter("Mogi das Cruzes"); // valor fixo só para teste
+
+        return viaCepService.verificarDistribuicao(cep, produto);
+    }
+}
+
+######################
+# 6. Teste via Postman
+######################
+GET http://localhost:8080/produtos/verificar?cep=08773-050&id=p1
+
+Retorno esperado:
+true ou false
